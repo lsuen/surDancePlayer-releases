@@ -1,0 +1,186 @@
+# Build Windows / macOS from a private Gitea clone; upload to this releases repo.
+#
+# Secrets (Settings → Secrets and variables → Actions):
+#   GITEA_CLONE_URL  e.g. https://git.nnrc.ren/swl/surDancePlayer.git
+#   GITEA_TOKEN      token with repo read on that Gitea
+#
+# Gitea host runners are Linux-only → Windows NSIS cannot be built there.
+# Use this workflow, or build on a Windows PC and gh release upload.
+name: Build desktop packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version without v (e.g. 3.1.38)"
+        required: true
+        type: string
+      platforms:
+        description: "Which jobs to run"
+        required: true
+        type: choice
+        options:
+          - both
+          - windows
+          - macos
+        default: both
+      create_release:
+        description: "Create/update GitHub Release and upload assets"
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    if: ${{ inputs.platforms == 'both' || inputs.platforms == 'windows' }}
+    runs-on: windows-latest
+    steps:
+      - name: Clone source from Gitea
+        shell: bash
+        env:
+          GITEA_CLONE_URL: ${{ secrets.GITEA_CLONE_URL }}
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${GITEA_CLONE_URL:-}" || -z "${GITEA_TOKEN:-}" ]]; then
+            echo "Missing GITEA_CLONE_URL or GITEA_TOKEN."
+            exit 1
+          fi
+          auth_url="$(echo "$GITEA_CLONE_URL" | sed -E "s#https://#https://oauth2:${GITEA_TOKEN}@#")"
+          git clone --depth 1 "$auth_url" src
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install NSIS
+        shell: bash
+        run: choco install nsis -y
+
+      - name: Build web + Windows release
+        working-directory: src
+        shell: pwsh
+        run: |
+          $env:Path = "C:\Program Files (x86)\NSIS;$env:Path"
+          .\scripts\build\release.ps1 -Version "${{ inputs.version }}"
+
+      - name: Pack portable zip
+        shell: bash
+        run: |
+          set -euo pipefail
+          VER="${{ inputs.version }}"
+          DAY="$(ls -d src/release/v${VER}_* | head -1)"
+          PORTABLE="$DAY/win/portable"
+          SETUP="$(ls "$DAY"/win/surDancePlayer-Setup-*.exe 2>/dev/null | head -1 || true)"
+          mkdir -p out
+          powershell -Command "Compress-Archive -Path '$PORTABLE\*' -DestinationPath 'out/surDancePlayer-win-portable-${VER}.zip' -Force"
+          if [[ -n "${SETUP:-}" && -f "$SETUP" ]]; then
+            cp "$SETUP" "out/surDancePlayer-Setup-${VER}.exe"
+          fi
+          ls -la out
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-${{ inputs.version }}
+          path: out/*
+
+  macos:
+    if: ${{ inputs.platforms == 'both' || inputs.platforms == 'macos' }}
+    runs-on: macos-latest
+    steps:
+      - name: Clone source from Gitea
+        env:
+          GITEA_CLONE_URL: ${{ secrets.GITEA_CLONE_URL }}
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${GITEA_CLONE_URL:-}" || -z "${GITEA_TOKEN:-}" ]]; then
+            echo "Missing GITEA_CLONE_URL or GITEA_TOKEN."
+            exit 1
+          fi
+          auth_url="$(echo "$GITEA_CLONE_URL" | sed -E "s#https://#https://oauth2:${GITEA_TOKEN}@#")"
+          git clone --depth 1 "$auth_url" src
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build web + macOS app
+        working-directory: src
+        run: |
+          set -euo pipefail
+          VER="${{ inputs.version }}"
+          cd web && npm ci && npm run build && cd ..
+          cd crates/dance-desktop
+          npx --yes @tauri-apps/cli@2 build --bundles app \
+            --config "{\"build\":{\"beforeBuildCommand\":\"\"},\"version\":\"${VER}\"}"
+
+      - name: Zip app
+        run: |
+          set -euo pipefail
+          VER="${{ inputs.version }}"
+          ARCH="$(uname -m)"
+          case "$ARCH" in
+            arm64) SUFFIX=arm64 ;;
+            x86_64) SUFFIX=x64 ;;
+            *) SUFFIX="$ARCH" ;;
+          esac
+          APP="$(find src/target src/crates/dance-desktop/target -name 'surDancePlayer.app' -type d 2>/dev/null | head -1)"
+          test -d "$APP"
+          mkdir -p out
+          ditto -c -k --sequesterRsrc --keepParent "$APP" "out/surDancePlayer-macos-${VER}-${SUFFIX}.zip"
+          ls -la out
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ inputs.version }}
+          path: out/*
+
+  publish:
+    needs: [windows, macos]
+    if: ${{ always() && inputs.create_release }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+        continue-on-error: true
+
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          VER="${{ inputs.version }}"
+          TAG="v${VER}"
+          mkdir -p artifacts
+          shopt -s nullglob
+          FILES=(artifacts/*)
+          if [[ ${#FILES[@]} -eq 0 ]]; then
+            echo "No artifacts to publish (builds may have been skipped or failed)."
+            exit 1
+          fi
+          NOTES=$'See README for install steps.\n\n安装说明见仓库 README（上英文 / 下中文）。'
+          if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${FILES[@]}" --repo "${{ github.repository }}" --clobber
+          else
+            gh release create "$TAG" "${FILES[@]}" \
+              --repo "${{ github.repository }}" \
+              --title "surDancePlayer ${VER}" \
+              --notes "$NOTES"
+          fi
