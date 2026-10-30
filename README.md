@@ -1,8 +1,9 @@
 # surDancePlayer
 
-Beat-aware dance practice player for Android, Windows, and macOS.
+Beat-aware dance practice player for Android, Windows, macOS, and Linux CLI.
 
-**This repository publishes release packages only.** Source code is maintained privately (Gitea). Download installers from [Releases](https://github.com/lsuen/surDancePlayer-releases/releases).
+**This repository publishes release packages only.** Source is private. Download installers from [Releases](https://github.com/lsuen/surDancePlayer-releases/releases).  
+**Download hub (all platforms):** https://lsuen.github.io/surdance-web/downloads.html
 
 ---
 
@@ -16,22 +17,23 @@ Beat-aware dance practice player for Android, Windows, and macOS.
 | Windows | `surDancePlayer-Setup-VERSION.exe` | NSIS installer (WebView2 required) |
 | Windows (portable) | `surDancePlayer-win-portable-VERSION.zip` | Unzip and run `surDancePlayer.exe` |
 | macOS | `surDancePlayer-macos-VERSION-arm64.zip` / `…-x64.zip` | Unzip → `surDancePlayer.app` |
+| Linux CLI | `surDancePlayer-linux-cli-VERSION.tar.gz` | `dance-player` + embedded `web/` |
 
-Replace `VERSION` with the tag on the [Releases](https://github.com/lsuen/surDancePlayer-releases/releases) page (for example `3.1.38`).
+Replace `VERSION` with the tag on the [Releases](https://github.com/lsuen/surDancePlayer-releases/releases) page (for example `3.1.43`).
 
 ### Install
 
 #### Android
 
 1. Download the `full` APK from Releases.
-2. On the device, allow install from this source if prompted.
-3. Open the APK and install. Desktop name: **SurDance**.
+2. Allow install from this source if prompted.
+3. Install. Desktop name: **SurDance**.
 
 #### Windows
 
-1. Download `surDancePlayer-Setup-VERSION.exe` and run it, **or** unzip the portable zip and run `surDancePlayer.exe`.
-2. Install [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/) if Windows asks for it.
-3. Launch from Start Menu / Desktop shortcut (installer) or the portable folder.
+1. Download `surDancePlayer-Setup-VERSION.exe` **or** the portable zip.
+2. Install [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/) if Windows asks.
+3. Launch from Start Menu or the portable folder.
 
 #### macOS (Homebrew — recommended)
 
@@ -40,27 +42,27 @@ brew tap lsuen/surdance
 brew install --cask surdance-player
 ```
 
-Upgrade later:
-
-```bash
-brew update
-brew upgrade --cask surdance-player
-```
-
 #### macOS (manual)
 
 1. Download the zip for your chip (`arm64` = Apple Silicon, `x64` = Intel).
 2. Unzip, drag `surDancePlayer.app` to Applications.
-3. First launch (unsigned build): right-click the app → **Open**, or run:
+3. First launch (unsigned): right-click → **Open**, or `xattr -cr /Applications/surDancePlayer.app`.
+
+#### Linux CLI
 
 ```bash
-xattr -cr /Applications/surDancePlayer.app
+tar -xzf surDancePlayer-linux-cli-VERSION.tar.gz
+cd linuxcli
+./dance-player serve --host 127.0.0.1 --port 8080 --web-dist web
+# open http://127.0.0.1:8080
 ```
 
 ### Web / online
 
-- Production: https://dance.nnrc.ren  
-- Preview: https://tdance.nnrc.ren  
+- Free WebApp: https://lsuen.github.io/surdance-web/
+- Downloads hub: https://lsuen.github.io/surdance-web/downloads.html
+- Preview: https://tdance.nnrc.ren
+- Production: https://dance.nnrc.ren
 
 ---
 
@@ -74,22 +76,20 @@ xattr -cr /Applications/surDancePlayer.app
 | Windows | `surDancePlayer-Setup-VERSION.exe` | 安装包（需 WebView2） |
 | Windows 绿色版 | `surDancePlayer-win-portable-VERSION.zip` | 解压运行 `surDancePlayer.exe` |
 | macOS | `surDancePlayer-macos-VERSION-arm64.zip` / `…-x64.zip` | 解压得到 `surDancePlayer.app` |
+| Linux 命令行 | `surDancePlayer-linux-cli-VERSION.tar.gz` | `dance-player` + 内嵌 `web/` |
 
-`VERSION` 以 [Releases](https://github.com/lsuen/surDancePlayer-releases/releases) 页面标签为准。
+`VERSION` 以 [Releases](https://github.com/lsuen/surDancePlayer-releases/releases) 标签为准。  
+各系统汇总：https://lsuen.github.io/surdance-web/downloads.html
 
 ### 安装
 
 #### Android
 
-1. 从 Releases 下载 `full` APK。  
-2. 按系统提示允许「未知来源」安装。  
-3. 安装后桌面名：**SurDance**。
+下载 `full` APK → 允许未知来源（如需要）→ 安装。桌面名 **SurDance**。
 
 #### Windows
 
-1. 运行 `surDancePlayer-Setup-VERSION.exe`，或解压绿色版后运行 `surDancePlayer.exe`。  
-2. 若提示缺少组件，安装 [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/)。  
-3. 从开始菜单 / 桌面快捷方式，或绿色版目录启动。
+下载 Setup 或 portable zip → 缺组件时安装 WebView2 → 运行。
 
 #### macOS（推荐 Homebrew）
 
@@ -98,28 +98,20 @@ brew tap lsuen/surdance
 brew install --cask surdance-player
 ```
 
-升级：
+或下载 zip，把 `.app` 拖进「应用程序」。首次未签名可右键打开或执行 `xattr -cr /Applications/surDancePlayer.app`。
+
+#### Linux 命令行
 
 ```bash
-brew update
-brew upgrade --cask surdance-player
+tar -xzf surDancePlayer-linux-cli-VERSION.tar.gz
+cd linuxcli
+./dance-player serve --host 127.0.0.1 --port 8080 --web-dist web
+# 浏览器打开 http://127.0.0.1:8080
 ```
 
-#### macOS（手动）
+### 在线
 
-1. 按芯片下载对应 zip（`arm64` = Apple 芯片，`x64` = Intel）。  
-2. 解压后把 `surDancePlayer.app` 拖到「应用程序」。  
-3. 首次打开（未公证）：在 Finder 里右键 → **打开**，或执行：
-
-```bash
-xattr -cr /Applications/surDancePlayer.app
-```
-
-### 网页版
-
-- 生产：https://dance.nnrc.ren  
-- 预览：https://tdance.nnrc.ren  
-
-### 作者
-
-孙文龙 (Sun Wenlong)
+- 无偿 WebApp：https://lsuen.github.io/surdance-web/
+- 下载导航：https://lsuen.github.io/surdance-web/downloads.html
+- 预览：https://tdance.nnrc.ren
+- 生产：https://dance.nnrc.ren
